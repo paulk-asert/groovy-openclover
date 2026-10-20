@@ -1,0 +1,150 @@
+/*
+ * SPDX-License-Identifier: Apache-2.0
+ *
+ * Licensed under the Apache License, Version 2.0 (the "License");
+ * you may not use this file except in compliance with the License.
+ * You may obtain a copy of the License at
+ *
+ *     https://www.apache.org/licenses/LICENSE-2.0
+ *
+ * Unless required by applicable law or agreed to in writing, software
+ * distributed under the License is distributed on an "AS IS" BASIS,
+ * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+ * See the License for the specific language governing permissions and
+ * limitations under the License.
+ */
+
+// Wires OpenClover's Ant tasks into a Gradle 9 Groovy build.
+// The Gradle plugin for (Open)Clover predates Gradle 9, so we drive
+// <clover-setup>, <groovyc> and the report tasks directly.
+
+configurations {
+    clover
+    cloverGroovyc
+    cloverTools
+}
+
+dependencies {
+    clover "org.openclover:clover:$openCloverVersion"
+    cloverGroovyc "org.apache.groovy:groovy-ant:$groovyVersion"
+    cloverTools "org.apache.groovy:groovy:$groovyVersion"
+    cloverTools "org.apache.groovy:groovy-json:$groovyVersion"
+    cloverTools "org.openclover:clover:$openCloverVersion"
+}
+
+def cloverDir = layout.buildDirectory.dir('clover')
+def cloverDb = cloverDir.map { it.file('clover.db').asFile.absolutePath }
+def instrMain = cloverDir.map { it.dir('classes/main') }
+def instrTest = cloverDir.map { it.dir('classes/test') }
+def testSrc = 'src/test/groovy'
+
+def defineCloverTasks = {
+    // define once per build: a second classloader would make Clover's own types incompatible
+    if (!ant.project.taskDefinitions.containsKey('clover-setup')) {
+        ant.taskdef(resource: 'cloverlib.xml', classpath: configurations.clover.asPath)
+    }
+}
+
+tasks.register('cloverInstrument') {
+    group = 'verification'
+    description = 'Compiles main and test sources with OpenClover instrumentation'
+    dependsOn 'processResources', 'processTestResources'
+    inputs.files(sourceSets.main.allSource, sourceSets.test.allSource)
+    outputs.dir(cloverDir)
+    doLast {
+        def out = cloverDir.get().asFile
+        // an optimized run needs the previous database and snapshot; a full run starts afresh
+        ant.delete(dir: gradle.taskGraph.hasTask(":cloverOptimizedTest") ? "$out/classes" : out)
+        defineCloverTasks()
+        ant.taskdef(name: 'groovyc', classname: 'org.codehaus.groovy.ant.Groovyc',
+                classpath: (configurations.cloverGroovyc + configurations.compileClasspath).asPath)
+        // Instrumenting the test sources too is what enables per-test coverage
+        ant.'clover-setup'(initString: cloverDb.get(), tmpDir: "$out/tmp") {
+            testSources(dir: testSrc) {
+                include(name: '**/*Test.groovy')
+                include(name: '**/*Spec.groovy')
+            }
+        }
+        [instrMain, instrTest]*.get()*.asFile*.mkdirs()
+        ant.groovyc(srcdir: 'src/main/groovy', destdir: instrMain.get().asFile,
+                classpath: (configurations.compileClasspath + configurations.clover).asPath)
+        ant.groovyc(srcdir: testSrc, destdir: instrTest.get().asFile,
+                classpath: (configurations.testCompileClasspath + configurations.clover + files(instrMain)).asPath)
+    }
+}
+
+def instrumentedTest = { Test t ->
+    t.group = 'verification'
+    t.dependsOn 'cloverInstrument'
+    t.testClassesDirs = files(instrTest)
+    t.classpath = files(instrTest, instrMain, sourceSets.main.output.resourcesDir,
+            sourceSets.test.output.resourcesDir, configurations.testRuntimeClasspath, configurations.clover)
+}
+
+tasks.register('cloverTest', Test) {
+    description = 'Runs the instrumented tests, recording per-test coverage'
+    instrumentedTest(it)
+    doLast {
+        defineCloverTasks()
+        ant.'clover-snapshot'(initString: cloverDb.get())
+    }
+}
+
+tasks.register('cloverReport') {
+    group = 'verification'
+    description = 'Generates HTML and XML OpenClover reports'
+    dependsOn 'cloverTest'
+    doLast {
+        def out = cloverDir.get().asFile
+        defineCloverTasks()
+        ant.'clover-html-report'(initString: cloverDb.get(), outdir: "$out/html", showUniqueCoverage: true)
+        ant.'clover-report'(initString: cloverDb.get()) {
+            current(outfile: "$out/clover.xml") { format(type: 'xml') }
+        }
+    }
+}
+
+tasks.register('cloverOptimizedTest', Test) {
+    description = "Re-runs only tests touching changed files, using OpenClover's test optimization"
+    instrumentedTest(it)
+    doFirst {
+        defineCloverTasks()
+        ant.'clover-setup'(initString: cloverDb.get())
+        def optimized = ant.'clover-optimized-testset' {
+            fileset(dir: testSrc) {
+                include(name: '**/*Test.groovy')
+                include(name: '**/*Spec.groovy')
+            }
+        }
+        def classes = optimized.collect { it.name - ~/\.groovy$/ }.collect { it.replace('/', '.') }
+        logger.lifecycle "OpenClover selected ${classes.size()} test class(es): $classes"
+        if (classes) classes.each { filter.includeTestsMatching(it) }
+        else filter.includeTestsMatching('__none__')
+        filter.failOnNoMatchingTests = false
+    }
+    doLast {
+        ant.'clover-snapshot'(initString: cloverDb.get())
+    }
+}
+
+tasks.register('cloverTestMap', JavaExec) {
+    group = 'verification'
+    description = 'Exports per-test coverage as build/clover/test-map.json'
+    dependsOn 'cloverTest'
+    classpath = configurations.cloverTools
+    mainClass = 'groovy.ui.GroovyMain'
+    workingDir = rootDir
+    args rootProject.file('tools/TestMap.groovy'), cloverDb.get(), rootDir.toPath().relativize(projectDir.toPath()),
+            cloverDir.get().file('test-map.json').asFile.absolutePath
+}
+
+tasks.register('affectedTests', JavaExec) {
+    group = 'verification'
+    description = 'Lists the tests covering lines changed since the test map was built'
+    classpath = configurations.cloverTools
+    mainClass = 'groovy.ui.GroovyMain'
+    workingDir = rootDir
+    args rootProject.file('tools/AffectedTests.groovy'), cloverDir.get().file('test-map.json').asFile.absolutePath
+    if (providers.gradleProperty('json').isPresent()) args '--json'
+    providers.gradleProperty('lines').getOrElse('').tokenize(',').each { args '--lines', it }
+}

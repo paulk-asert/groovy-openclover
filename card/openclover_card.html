@@ -1,0 +1,95 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><style>
+  * { margin:0; padding:0; box-sizing:border-box; }
+  body { width:1176px; height:672px; background:#10141d;
+    font-family:-apple-system,'Segoe UI',Roboto,sans-serif; color:#e8edf4;
+    padding:40px 52px 32px; display:flex; flex-direction:column; overflow:hidden; }
+  .top { display:flex; justify-content:space-between; align-items:baseline; }
+  .kicker { color:#6cb6ff; font-size:15px; font-weight:700; letter-spacing:3.5px; }
+  .toplabel { color:#8b949e; font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:14px; }
+  h1 { font-size:41px; font-weight:800; line-height:1.15; margin-top:12px; letter-spacing:-0.6px; }
+  h1 .accent { color:#6cb6ff; }
+  .byline { font-size:17px; color:#8b949e; margin-top:7px; }
+  .byline b { color:#b7c1cc; font-weight:600; }
+  .panels { display:flex; gap:22px; margin-top:18px; flex:1; min-height:0; }
+  .panel { background:#161b26; border:1px solid #2a3140; border-radius:12px;
+    padding:15px 19px 13px; border-left:3px solid #4caf7d; display:flex; flex-direction:column; }
+  .panel.code { flex:1.15; border-left-color:#6cb6ff; }
+  .panel.tests { flex:1; }
+  .pill { display:inline-block; font-size:12px; font-weight:700; letter-spacing:2.3px;
+    padding:4px 12px; border-radius:999px; margin-bottom:9px; align-self:flex-start; }
+  .pill.a { color:#7ee787; border:1px solid #3f8b56; }
+  .pill.c { color:#6cb6ff; border:1px solid #3b6a99; }
+  pre { font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:14px; line-height:1.62; color:#e8edf4; }
+  .ln { color:#4d5766; display:inline-block; width:26px; }
+  .hits { color:#768390; display:inline-block; width:30px; text-align:right; margin-right:12px; }
+  .kw { color:#79c0ff; } .str { color:#a5d6a1; } .num { color:#f0b35e; } .mut { color:#768390; }
+  .del { background:rgba(255,136,120,.13); display:block; margin:0 -19px; padding:0 19px; }
+  .add { background:rgba(126,231,135,.12); display:block; margin:0 -19px; padding:0 19px; }
+  .del .hits, .add .hits { color:#e8edf4; font-weight:700; }
+  .gap { color:#ff8878; }
+  .t { font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:12.8px; line-height:1.72; color:#5c6675;
+    display:flex; align-items:center; gap:9px; }
+  .t i { width:9px; height:9px; border-radius:3px; background:#2a3140; flex:none; }
+  .t.on { color:#e8edf4; } .t.on i { background:#4caf7d; }
+  .tally { margin-top:auto; padding-top:8px; display:flex; gap:22px; font-size:13.5px; color:#8b949e; }
+  .tally b { font-size:21px; color:#e8edf4; margin-right:6px; }
+  .tally .g b { color:#7ee787; }
+  .strip { display:flex; gap:10px; margin-top:14px; }
+  .chip { flex:1; background:#161b26; border:1px solid #2a3140; border-radius:10px;
+    padding:8px 14px; font-size:13.5px; color:#b7c1cc; text-align:center; }
+  .chip b { color:#e8edf4; }
+  .footer { display:flex; justify-content:space-between; align-items:baseline; margin-top:auto; padding-top:18px; }
+  .takeaway { font-size:16.5px; color:#b7c1cc; }
+  .takeaway b { color:#e8edf4; }
+  .site { color:#8b949e; font-family:ui-monospace,'SF Mono',Menlo,monospace; font-size:14px; }
+</style></head><body>
+  <div class="top">
+    <div class="kicker">GROOVY 6 &#183; PER-TEST COVERAGE</div>
+    <div class="toplabel">OpenClover &#183; ./gradlew affectedTests</div>
+  </div>
+  <h1>Change one line, <span class="accent">run only the tests that ran it</span></h1>
+  <div class="byline">Instrument the <b>tests</b> as well as the code, and coverage turns into a <b>reverse index</b> from lines to tests</div>
+
+  <div class="panels">
+    <div class="panel code">
+      <span class="pill c">PRICING.GROOVY &#183; TESTS PER LINE</span>
+<pre><span class="ln">29</span><span class="hits">5</span><span class="kw">static</span> BigDecimal extraPrice(String extra) {
+<span class="ln">30</span><span class="hits">5</span>    <span class="kw">val</span> price = <span class="kw">switch</span> (extra) {
+<span class="ln">31</span><span class="hits">3</span>        <span class="kw">case</span> <span class="str">'oat'</span>, <span class="str">'soy'</span> -&gt; <span class="num">0.60</span>
+<span class="del"><span class="ln">32</span><span class="hits">3</span><span class="mut">-</span>       <span class="kw">case</span> <span class="str">'shot'</span> -&gt; <span class="num">0.90</span></span><span class="add"><span class="ln"></span><span class="hits"></span><span class="mut">+</span>       <span class="kw">case</span> <span class="str">'shot'</span> -&gt; <span class="num">1.00</span></span><span class="ln">33</span><span class="hits gap">&#183;</span>        <span class="kw">default</span> -&gt; <span class="num">0.40</span>  <span class="mut">// Groovy 6 gap</span>
+<span class="ln">34</span><span class="hits"></span>    }
+<span class="ln">35</span><span class="hits">5</span>    price
+<span class="ln">36</span><span class="hits"></span>}</pre>
+      <div class="tally"><span><b>1</b>line changed</span><span><b>11</b>tests in suite</span></div>
+    </div>
+    <div class="panel tests">
+      <span class="pill a">SELECTED FROM THE TEST MAP</span>
+      <div class="t on"><i></i>PricingTest.extraShot</div>
+      <div class="t on"><i></i>PricingTest.priceIncludesExtras</div>
+      <div class="t on"><i></i>ReceiptSpec."a receipt lists each drink&#8230;"</div>
+      <div class="t"><i></i>PricingTest.smallIsCheapest</div>
+      <div class="t"><i></i>PricingTest.largeBasePrice</div>
+      <div class="t"><i></i>PricingTest.plantMilkCostsExtra</div>
+      <div class="t"><i></i>OrderTest.emptyOrderIsFree</div>
+      <div class="t"><i></i>OrderTest.subtotalAddsDrinks</div>
+      <div class="t"><i></i>OrderTest.threeOrMoreDrinks&#8230;</div>
+      <div class="t"><i></i>OrderTest.tenStampsEarn&#8230;</div>
+      <div class="t"><i></i>ReceiptSpec."a receipt shows any discount"</div>
+      <div class="tally"><span class="g"><b>3</b>run, 3 fail</span><span><b>8</b>skipped, all pass</span></div>
+    </div>
+  </div>
+
+  <div class="strip">
+    <div class="chip"><b>OpenClover</b> 5.1.1</div>
+    <div class="chip"><b>Groovy</b> 6.0.0</div>
+    <div class="chip"><b>JUnit</b> 6</div>
+    <div class="chip"><b>Spock</b> 2.5</div>
+    <div class="chip"><b>Gradle</b> 9</div>
+  </div>
+
+  <div class="footer">
+    <div class="takeaway"><b>Built for agents:</b> a JSON test map and a git diff say exactly what to re-run.</div>
+    <div class="site">groovy.apache.org/blog</div>
+  </div>
+</body></html>
