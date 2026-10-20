@@ -18,7 +18,9 @@
 // test map was built. Each changed hunk is resolved as precisely as the
 // map allows: statement -> enclosing method -> whole file -> everything.
 // Run from the repository root.
-// Usage: AffectedTests.groovy <test-map.json> [--json] [--lines path:from[-to]]...
+// Usage: AffectedTests.groovy <test-map.json> [--json | --filters] [--lines path:from[-to]]...
+//   --json     compact summary for agents (counts and classes, not every test name)
+//   --filters  the full selection, read by the testAffected Gradle task
 
 import groovy.json.JsonOutput
 import groovy.json.JsonSlurper
@@ -26,6 +28,7 @@ import groovy.json.JsonSlurper
 def opts = args.toList()
 def map = new JsonSlurper().parse(new File(opts.pop()))
 def asJson = opts.remove('--json')
+def asFilters = opts.remove('--filters')
 def git = { String... cmd -> (['git', *cmd]).execute().text }
 def prefix = map.project ? "$map.project/" : ''
 // changes outside these paths can't affect this project's tests
@@ -90,12 +93,18 @@ def selected = results.collectMany { it.tests ?: [] }.unique().sort().collect { 
 def filters = runAll ? [] : (selected.collect { "${it.className}.${it.name}" } +
         results.collectMany { it.filters ?: [] }).unique()
 def uncovered = results.findAll { it.tests == [] }*.hunk*.toString()
-def test = map.project ? ":${map.project.replace('/', ':')}:test" : ':test'
-def command = runAll ? "./gradlew $test" : filters ? "./gradlew $test ${filters.collect { "--tests '$it'" }.join(' ')}" : null
+def run = "./gradlew -q ${map.project ? ":${map.project.replace('/', ':')}" : ''}:testAffected"
+def classes = runAll ? [] : (selected*.className + results.collectMany { it.filters ?: [] }).unique()
 
+if (asFilters) {
+    println JsonOutput.toJson(runAll: runAll, filters: filters, uncovered: uncovered)
+    return
+}
 if (asJson) {
+    // an agent re-reads every tool result on every later turn, so keep this short
     println JsonOutput.prettyPrint(JsonOutput.toJson(
-            baseline: map.baseline, runAll: runAll, tests: filters, uncovered: uncovered, command: command,
+            baseline: map.baseline, runAll: runAll, testCount: filters.size(), testClasses: classes,
+            uncovered: uncovered, run: runAll || filters ? run : null,
             hunks: results.collect { [location: it.hunk.toString(), level: it.level, tests: it.tests?.size()] }))
     return
 }
@@ -108,4 +117,6 @@ results.each { r ->
 }
 uncovered.each { println "No test covers: $it" }
 println()
-println command ? "Run: $command" : 'No tests need to run'
+if (!runAll && !filters) { println 'No tests need to run'; return }
+filters.each { println "  $it" }
+println "Run: $run"

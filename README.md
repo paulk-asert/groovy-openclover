@@ -31,7 +31,8 @@ Requires JDK 17+.
 ./gradlew cloverTestMap        # instrumented run + build/clover/test-map.json
 ./gradlew cloverOptimizedTest  # OpenClover test optimization (file granularity)
 ./gradlew -q :affectedTests     # line-level selection for your uncommitted changes
-./gradlew -q :affectedTests -Pjson
+./gradlew -q :testAffected      # ... and run just those tests
+./gradlew -q :affectedTests -Pjson   # compact summary for agents
 ./gradlew -q :affectedTests -Plines=src/main/groovy/coffee/Pricing.groovy:32
 ```
 
@@ -41,9 +42,17 @@ Typical session:
 $ ./gradlew -q :cloverTestMap
 $ sed -i "s/case 'shot' -> 0.90/case 'shot' -> 1.00/" src/main/groovy/coffee/Pricing.groovy
 $ ./gradlew -q :affectedTests
-src/main/groovy/coffee/Pricing.groovy:32         line                     3 test(s)
+src/main/groovy/coffee/Pricing.groovy:32             line               3 test(s)
 
-Run: ./gradlew :test --tests 'coffee.ReceiptSpec.a receipt lists each drink and the total' --tests 'coffee.PricingTest.extraShot' --tests 'coffee.PricingTest.priceIncludesExtras'
+  coffee.ReceiptSpec.a receipt lists each drink and the total
+  coffee.PricingTest.extraShot
+  coffee.PricingTest.priceIncludesExtras
+Run: ./gradlew -q :testAffected
+$ ./gradlew -q :testAffected
+Running 3 test(s)
+
+ReceiptSpec > a receipt lists each drink and the total FAILED
+...
 ```
 
 See [AGENTS.md](AGENTS.md) for the instructions given to coding agents.

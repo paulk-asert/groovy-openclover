@@ -148,3 +148,33 @@ tasks.register('affectedTests', JavaExec) {
     if (providers.gradleProperty('json').isPresent()) args '--json'
     providers.gradleProperty('lines').getOrElse('').tokenize(',').each { args '--lines', it }
 }
+
+tasks.register('testAffected', Test) {
+    group = 'verification'
+    description = 'Runs only the tests that executed the lines changed since the test map was built'
+    testClassesDirs = sourceSets.test.output.classesDirs
+    classpath = sourceSets.test.runtimeClasspath
+    def selection = providers.javaexec {
+        classpath = configurations.cloverTools
+        mainClass = 'groovy.ui.GroovyMain'
+        workingDir = rootDir
+        args rootProject.file('tools/AffectedTests.groovy'), cloverDir.get().file('test-map.json').asFile.absolutePath, '--filters'
+    }.standardOutput.asText
+    outputs.upToDateWhen { false }
+    // name the failures even under -q, which is how agents are told to run this
+    testLogging.quiet {
+        events 'failed'
+        exceptionFormat = 'short'
+    }
+    doFirst {
+        def s = new groovy.json.JsonSlurper().parseText(selection.get())
+        s.uncovered.each { logger.quiet "No test covers: $it" }
+        if (s.runAll) {
+            logger.quiet 'Running all tests'
+            return
+        }
+        logger.quiet s.filters ? "Running ${s.filters.size()} test(s)" : 'No tests need to run'
+        (s.filters ?: ['__none__']).each { filter.includeTestsMatching(it) }
+        filter.failOnNoMatchingTests = false
+    }
+}
